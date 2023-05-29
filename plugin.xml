@@ -14,11 +14,11 @@
             </feature>
         </config-file>
         <!-- REMOVE RAW PORT SUPPORT TO AVOID WHITELIST FOR NOW -->
-        <!-- <config-file target="*-Info.plist" parent="UISupportedExternalAccessoryProtocols">
+        <config-file target="*-Info.plist" parent="UISupportedExternalAccessoryProtocols">
             <array>
                 <string>com.zebra.rawport</string>
             </array>
-        </config-file> -->
+        </config-file>
         <!-- Zebra SDK -->
         <header-file src="src/ios/ZebraPrinter/lib/include/DiscoveredPrinter.h" />
         <header-file src="src/ios/ZebraPrinter/lib/include/DiscoveredPrinterNetwork.h" />
