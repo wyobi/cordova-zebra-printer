@@ -23,6 +23,11 @@ import java.util.Set;
 import com.zebra.sdk.comm.BluetoothConnection;
 import com.zebra.sdk.comm.Connection;
 import com.zebra.sdk.comm.ConnectionException;
+
+import com.zebra.sdk.btleComm.BluetoothLeConnection;
+import com.zebra.sdk.btleComm.BluetoothLeDiscoverer;
+import com.zebra.sdk.btleComm.DiscoveredPrinterBluetoothLe;
+
 import com.zebra.sdk.printer.PrinterStatus;
 import com.zebra.sdk.printer.ZebraPrinterFactory;
 import com.zebra.sdk.printer.ZebraPrinterLanguageUnknownException;
@@ -111,7 +116,11 @@ public class ZebraPrinter extends CordovaPlugin {
             if (instance.connect(address)) {
                 callbackContext.success();
             } else {
-                callbackContext.error("Connect Failed");
+                if (instance.connectBLE(address)) {
+                    callbackContext.success();
+                } else {
+                    callbackContext.error("Connect Failed");
+                }
             }
         });
     }
@@ -254,6 +263,56 @@ public class ZebraPrinter extends CordovaPlugin {
         }
     }
 
+    private boolean connectBLE(String macAddress) {
+        synchronized (ZebraPrinter.lock) {
+            Log.v("EMO", "Printer - Connecting to " + macAddress);
+            //disconnect if we are already connected
+            try {
+                if (printerConnection != null && printerConnection.isConnected()) {
+                    printerConnection.close();
+                    printerConnection = null;
+                    printer = null;
+                }
+            }catch (Exception ex){
+                Log.v("EMO", "Printer - Failed to close connection before connecting", ex);
+            }
+
+            //create a new BT connection
+            printerConnection = new BluetoothLeConnection(macAddress);
+
+            //check that it isn't null
+            if(printerConnection == null){
+                return false;
+            }
+
+            //open that connection
+            try {
+                printerConnection.open();
+            } catch (Exception e) {
+                Log.v("EMO", "Printer - Failed to open connection", e);
+                printerConnection = null;
+                printer = null;
+                return false;
+            }
+
+            //check if it opened
+            if (printerConnection != null && printerConnection.isConnected()) {
+                //try to get a printer
+                try {
+                    printer = ZebraPrinterFactory.getInstance(printerConnection);
+                } catch (Exception e) {
+                    Log.v("EMO", "Printer - Error...", e);
+                    closePrinter();
+                    return false;
+                }
+                return true;
+            }else {
+                //printer was null or not connected
+                return false;
+            }
+        }
+    }
+
     /***
      * Disconnects from the currently connected printer
      */
@@ -335,6 +394,14 @@ public class ZebraPrinter extends CordovaPlugin {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
             {
                 ActivityCompat.requestPermissions(this.cordova.getActivity(), new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 2);
+            }
+        }
+
+        if (ContextCompat.checkSelfPermission(this.cordova.getContext(), Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_DENIED)
+        {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+            {
+                ActivityCompat.requestPermissions(this.cordova.getActivity(), new String[]{Manifest.permission.BLUETOOTH_SCAN}, 2);
             }
         }
 
