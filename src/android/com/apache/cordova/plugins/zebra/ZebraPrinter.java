@@ -4,6 +4,9 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.util.Log;
 
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
 import org.apache.cordova.CordovaPlugin;
 import org.apache.cordova.CallbackContext;
 
@@ -14,12 +17,15 @@ import org.json.JSONObject;
 
 import java.util.Set;
 
+import com.zebra.sdk.btleComm.BluetoothLeDiscoverer;
 import com.zebra.sdk.comm.BluetoothConnection;
 import com.zebra.sdk.comm.Connection;
 import com.zebra.sdk.comm.ConnectionException;
 import com.zebra.sdk.printer.PrinterStatus;
 import com.zebra.sdk.printer.ZebraPrinterFactory;
 import com.zebra.sdk.printer.ZebraPrinterLanguageUnknownException;
+
+
 
 public class ZebraPrinter extends CordovaPlugin {
     private Connection printerConnection;
@@ -323,6 +329,14 @@ public class ZebraPrinter extends CordovaPlugin {
     private JSONArray NonZebraDiscovery() {
         JSONArray printers = new JSONArray();
 
+        if (ContextCompat.checkSelfPermission(this.cordova.getContext(), Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_DENIED)
+        {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+            {
+                ActivityCompat.requestPermissions(this.cordova.getActivity(), new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 2);
+            }
+        }
+
         try {
             BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
             Set<BluetoothDevice> devices = adapter.getBondedDevices();
@@ -330,16 +344,30 @@ public class ZebraPrinter extends CordovaPlugin {
             for (BluetoothDevice device : devices) {
                 String name = device.getName();
                 String mac = device.getAddress();
+                int deviceTypeNum = device.getType();
+                String deviceType = "DEVICE_TYPE_CLASSIC";
+
+                if(deviceTypeNum == BluetoothDevice.DEVICE_TYPE_DUAL) {
+                    deviceType = "DEVICE_TYPE_DUAL";
+                }
+                else if(deviceTypeNum == BluetoothDevice.DEVICE_TYPE_LE) {
+                    deviceType = "DEVICE_TYPE_LE";
+                }
+                else if(deviceTypeNum > BluetoothDevice.DEVICE_TYPE_LE) {
+                    deviceType = "UNKNOWN";
+                }
 
                 JSONObject p = new JSONObject();
                 p.put("name", name);
                 p.put("address", mac);
+                p.put("type", deviceType);
                 printers.put(p);
 
             }
         } catch (Exception e) {
             System.err.println(e.getMessage());
         }
+
         return printers;
     }
 
