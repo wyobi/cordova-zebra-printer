@@ -1,7 +1,10 @@
 package com.apache.cordova.plugins.zebra;
 
+import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.util.Log;
 
 import androidx.core.app.ActivityCompat;
@@ -17,14 +20,12 @@ import org.json.JSONObject;
 
 import java.util.Set;
 
-import com.zebra.sdk.btleComm.BluetoothLeDiscoverer;
 import com.zebra.sdk.comm.BluetoothConnection;
 import com.zebra.sdk.comm.Connection;
 import com.zebra.sdk.comm.ConnectionException;
 import com.zebra.sdk.printer.PrinterStatus;
 import com.zebra.sdk.printer.ZebraPrinterFactory;
 import com.zebra.sdk.printer.ZebraPrinterLanguageUnknownException;
-
 
 
 public class ZebraPrinter extends CordovaPlugin {
