@@ -129,14 +129,14 @@ public class ZebraPrinter extends CordovaPlugin {
             type = addressTypeMap.get(address);
         }
 
-        if(type == "DEVICE_TYPE_CLASSIC" || type == "UNKNOWN") {
+        if(type == "DEVICE_TYPE_CLASSIC" || type == "UNKNOWN" || type == null) {
             cordova.getThreadPool().execute(() -> {
                 if (instance.connect(address)) {
                     callbackContext.success();
                 }
             });
         }
-        else if(type == "DEVICE_TYPE_DUAL" || type == null) {
+        else if(type == "DEVICE_TYPE_DUAL") {
             cordova.getThreadPool().execute(() -> {
                 if (instance.connectBLE(address)) {
                     callbackContext.success();
