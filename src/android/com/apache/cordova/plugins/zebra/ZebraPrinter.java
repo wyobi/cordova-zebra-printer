@@ -7,21 +7,20 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.util.Log;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
-
 import org.apache.cordova.CordovaPlugin;
 import org.apache.cordova.CallbackContext;
 
+import org.apache.cordova.LOG;
+import org.apache.cordova.PermissionHelper;
 import org.apache.cordova.PluginResult;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -39,11 +38,11 @@ import com.zebra.sdk.printer.ZebraPrinterFactory;
 
 import com.zebra.sdk.printer.ZebraPrinterLanguageUnknownException;
 
-
 public class ZebraPrinter extends CordovaPlugin implements AutoCloseable {
     private static Connection printerConnection;
     private static com.zebra.sdk.printer.ZebraPrinter printer;
     private static PrinterLanguage printerLanguage;
+    private CallbackContext permissionCallback;
 
     private static HashMap<String, String> addressTypeMap = new HashMap<String, String>();
 
@@ -98,6 +97,19 @@ public class ZebraPrinter extends CordovaPlugin implements AutoCloseable {
      */
     private void discover(final CallbackContext callbackContext) {
         final ZebraPrinter instance = this;
+        permissionCallback = callbackContext;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (!PermissionHelper.hasPermission(this, Manifest.permission.BLUETOOTH_SCAN) || !PermissionHelper.hasPermission(this, Manifest.permission.BLUETOOTH_CONNECT)) {
+                List<String> permissionsList = new ArrayList<String>();
+                permissionsList.add(Manifest.permission.BLUETOOTH_SCAN);
+                permissionsList.add(Manifest.permission.BLUETOOTH_CONNECT);
+                String[] permissionsArray = new String[permissionsList.size()];
+                PermissionHelper.requestPermissions(this, 2, permissionsList.toArray(permissionsArray));
+                return;
+            }
+        }
+
         cordova.getThreadPool().execute(() -> {
             JSONArray printers = instance.NonZebraDiscovery();
             if (printers != null) {
@@ -441,22 +453,6 @@ public class ZebraPrinter extends CordovaPlugin implements AutoCloseable {
     private JSONArray NonZebraDiscovery() {
         JSONArray printers = new JSONArray();
 
-        if (ContextCompat.checkSelfPermission(this.cordova.getContext(), Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_DENIED)
-        {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-            {
-                ActivityCompat.requestPermissions(this.cordova.getActivity(), new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 2);
-            }
-        }
-
-        if (ContextCompat.checkSelfPermission(this.cordova.getContext(), Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_DENIED)
-        {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
-            {
-                ActivityCompat.requestPermissions(this.cordova.getActivity(), new String[]{Manifest.permission.BLUETOOTH_SCAN}, 2);
-            }
-        }
-
         try {
             BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
             Set<BluetoothDevice> devices = adapter.getBondedDevices();
@@ -491,6 +487,25 @@ public class ZebraPrinter extends CordovaPlugin implements AutoCloseable {
         }
 
         return printers;
+    }
+
+    public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) {
+        for (int i = 0; i < permissions.length; i++) {
+            if (permissions[i].equals(Manifest.permission.BLUETOOTH_SCAN) && grantResults[i] == PackageManager.PERMISSION_DENIED) {
+                this.permissionCallback.error("Bluetooth Scan permission not granted.");
+                return;
+            } else if (permissions[i].equals(Manifest.permission.BLUETOOTH_CONNECT) && grantResults[i] == PackageManager.PERMISSION_DENIED) {
+                this.permissionCallback.error("Bluetooth Connect permission not granted.");
+                return;
+            }
+        }
+
+        switch(requestCode) {
+            case 2:
+                discover(this.permissionCallback);
+                this.permissionCallback = null;
+                break;
+        }
     }
 
     public void onDestroy() {
