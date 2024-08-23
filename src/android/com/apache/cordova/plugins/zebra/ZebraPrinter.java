@@ -40,7 +40,7 @@ import com.zebra.sdk.printer.ZebraPrinterFactory;
 import com.zebra.sdk.printer.ZebraPrinterLanguageUnknownException;
 
 
-public class ZebraPrinter extends CordovaPlugin {
+public class ZebraPrinter extends CordovaPlugin implements AutoCloseable {
     private static Connection printerConnection;
     private static com.zebra.sdk.printer.ZebraPrinter printer;
     private static PrinterLanguage printerLanguage;
@@ -494,15 +494,15 @@ public class ZebraPrinter extends CordovaPlugin {
     }
 
     public void onDestroy() {
-        try {
-            if (printerConnection != null && printerConnection.isConnected()) {
-                printerConnection.close();
-                printerConnection = null;
-                printer = null;
-                printerLanguage = null;
-            }
-        }catch (Exception ex){
-            Log.v("EMO", "Printer - Failed to close connection onDestroy", ex);
-        }
+        disconnect();
+    }
+
+    public void onReset() {
+        disconnect();
+    }
+
+    @Override
+    public void close() throws Exception {
+        disconnect();
     }
 }
