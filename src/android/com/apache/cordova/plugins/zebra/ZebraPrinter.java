@@ -1,15 +1,22 @@
 package com.apache.cordova.plugins.zebra;
 
 import android.Manifest;
+import android.app.PendingIntent;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.hardware.usb.UsbDevice;
+import android.hardware.usb.UsbManager;
 import android.os.Build;
 import android.util.Log;
 
+import org.apache.cordova.CordovaInterface;
 import org.apache.cordova.CordovaPlugin;
 import org.apache.cordova.CallbackContext;
 
+import org.apache.cordova.CordovaWebView;
 import org.apache.cordova.LOG;
 import org.apache.cordova.PermissionHelper;
 import org.apache.cordova.PluginResult;
@@ -37,6 +44,10 @@ import com.zebra.sdk.printer.PrinterStatus;
 import com.zebra.sdk.printer.ZebraPrinterFactory;
 
 import com.zebra.sdk.printer.ZebraPrinterLanguageUnknownException;
+import com.zebra.sdk.printer.discovery.DiscoveredPrinter;
+import com.zebra.sdk.printer.discovery.DiscoveredPrinterUsb;
+import com.zebra.sdk.printer.discovery.DiscoveryHandler;
+import com.zebra.sdk.printer.discovery.UsbDiscoverer;
 
 public class ZebraPrinter extends CordovaPlugin implements AutoCloseable {
     private static Connection printerConnection;
@@ -44,11 +55,44 @@ public class ZebraPrinter extends CordovaPlugin implements AutoCloseable {
     private static PrinterLanguage printerLanguage;
     private CallbackContext permissionCallback;
 
+    private static final String ACTION_USB_PERMISSION = "com.apache.cordova.plugins.zebra.USB_PERMISSION";
+
     private static HashMap<String, String> addressTypeMap = new HashMap<String, String>();
+    private static HashMap<String, DiscoveredPrinter> printerMap = new HashMap<String, DiscoveredPrinter>();
 
     private static final String lock = "ZebraPluginLock";
 
+    private UsbHelper usbHelper;
+
     @Override
+    public void initialize(CordovaInterface cordova, CordovaWebView webView) {
+        usbHelper = new UsbHelper(cordova.getActivity()) {
+            @Override
+            public void usbDisconnected(UsbDevice device) {
+                removeDisconnectedUsbPrinterFromHistory(device);
+            }
+
+            private void removeDisconnectedUsbPrinterFromHistory(UsbDevice device) {
+                String address = device.getDeviceName();
+                if(addressTypeMap.containsKey(address)) {
+                    addressTypeMap.remove(address);
+                }
+                if(printerMap.containsKey(address)) {
+                    printerMap.remove(address);
+                }
+            }
+
+            @Override
+            public void usbConnectedAndPermissionGranted(UsbDevice device) {
+                UsbManager usbManager = (UsbManager) cordova.getContext().getSystemService(Context.USB_SERVICE);
+                discover(permissionCallback);
+            }};
+
+        usbHelper.onCreate(cordova.getActivity().getIntent());
+
+        super.initialize(cordova, webView);
+    }
+
     public boolean execute(String action, JSONArray args, CallbackContext callbackContext) {
         Log.v("EMO", "Execute on ZebraPrinter Plugin called");
         switch (action) {
@@ -112,8 +156,11 @@ public class ZebraPrinter extends CordovaPlugin implements AutoCloseable {
 
         cordova.getThreadPool().execute(() -> {
             JSONArray printers = instance.NonZebraDiscovery();
-            if (printers != null) {
+            if (printers != null && printers.length() > 0) {
                 callbackContext.success(printers);
+            }
+            else if(printers != null) {
+                instance.USBZebraDiscovery(callbackContext);
             } else {
                 callbackContext.error("Discovery Failed");
             }
@@ -145,6 +192,15 @@ public class ZebraPrinter extends CordovaPlugin implements AutoCloseable {
             cordova.getThreadPool().execute(() -> {
                 if (instance.connect(address)) {
                     callbackContext.success();
+                }
+            });
+        }
+        else if(type == "USB") {
+            cordova.getThreadPool().execute(() -> {
+                if (instance.connectUsb(address)) {
+                    callbackContext.success();
+                } else {
+                    callbackContext.error("Connect Failed");
                 }
             });
         }
@@ -375,6 +431,71 @@ public class ZebraPrinter extends CordovaPlugin implements AutoCloseable {
     }
 
     /***
+     * Connects to a printer identified by the macAddress
+     * @param address
+     * @return
+     */
+    private boolean connectUsb(String address) {
+        synchronized (ZebraPrinter.lock) {
+
+            if(!printerMap.containsKey(address)) {
+                return false;
+            }
+
+            Log.v("EMO", "Printer - Connecting to " + address);
+            //disconnect if we are already connected
+            try {
+                if (printerConnection != null && printerConnection.isConnected()) {
+                    printerConnection.close();
+                    printerConnection = null;
+                    printer = null;
+                    printerLanguage = null;
+                }
+            }catch (Exception ex){
+                Log.v("EMO", "Printer - Failed to close connection before connecting", ex);
+            }
+
+            //create a new BT connection
+            printerConnection = printerMap.get(address).getConnection();
+
+            //check that it isn't null
+            if(printerConnection == null){
+                return false;
+            }
+
+            //open that connection
+            try {
+                printerConnection.open();
+            } catch (Exception e) {
+                Log.v("EMO", "Printer - Failed to open connection", e);
+                printerConnection = null;
+                printer = null;
+                printerLanguage = null;
+                return false;
+            }
+
+            //check if it opened
+            if (printerConnection != null && printerConnection.isConnected()) {
+                //try to get a printer
+                try {
+                    printer = ZebraPrinterFactory.getInstance(printerConnection);
+                    printerLanguage = printer.getPrinterControlLanguage();
+
+                } catch (Exception e) {
+                    Log.v("EMO", "Printer - Error...", e);
+                    printerLanguage = null;
+                    closePrinter();
+                    return false;
+                }
+                return true;
+            }else {
+                //printer was null or not connected
+                return false;
+            }
+        }
+    }
+
+    /***
      * Disconnects from the currently connected printer
      */
     private void disconnect() {
@@ -489,6 +610,54 @@ public class ZebraPrinter extends CordovaPlugin implements AutoCloseable {
         return printers;
     }
 
+    private void USBZebraDiscovery(CallbackContext callbackContext) {
+        try {
+            JSONArray printers = new JSONArray();
+            UsbDiscoverer.findPrinters(this.cordova.getContext(), new DiscoveryHandler() {
+                boolean seekingPermission = false;
+                public void foundPrinter(final DiscoveredPrinter printer) {
+
+                    UsbManager usbManager = (UsbManager) cordova.getContext().getSystemService(Context.USB_SERVICE);
+                    UsbDevice device = ((DiscoveredPrinterUsb)printer).device;
+                    if (usbManager.hasPermission(device) == false) {
+                        usbHelper.requestUsbPermission(usbManager, device);
+
+                        seekingPermission = true;
+                        return;
+                    }
+
+                    try {
+                        JSONObject p = new JSONObject();
+                        p.put("name", device.getProductName());
+                        p.put("address", printer.address);
+                        p.put("type", "USB");
+                        printers.put(p);
+
+                        addressTypeMap.put(printer.address, "USB");
+                        printerMap.put(printer.address, printer);
+                    } catch (Exception e) {
+                        System.err.println(e.getMessage());
+                    }
+                }
+
+                public void discoveryFinished() {
+                    if(seekingPermission) {
+                        return;
+                    }
+
+                    callbackContext.success(printers);
+                }
+
+                public void discoveryError(String message) {
+                    //TODO
+                    callbackContext.error("Failed to discover USB printers: " + message);
+                }
+            });
+        } catch (Exception e) {
+            System.err.println(e.getMessage());
+        }
+    }
+
     public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) {
         for (int i = 0; i < permissions.length; i++) {
             if (permissions[i].equals(Manifest.permission.BLUETOOTH_SCAN) && grantResults[i] == PackageManager.PERMISSION_DENIED) {
@@ -514,6 +683,24 @@ public class ZebraPrinter extends CordovaPlugin implements AutoCloseable {
 
     public void onReset() {
         disconnect();
+    }
+
+    @Override
+    public void onResume(boolean multitasking) {
+        if(usbHelper != null) {
+            usbHelper.onResume();
+        }
+
+        super.onResume(multitasking);
+    }
+
+    @Override
+    public void onPause(boolean multitasking) {
+        if(usbHelper != null) {
+            usbHelper.onPause();
+        }
+
+        super.onPause(multitasking);
     }
 
     @Override
