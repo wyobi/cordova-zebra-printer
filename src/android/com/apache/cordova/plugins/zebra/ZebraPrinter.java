@@ -686,6 +686,15 @@ public class ZebraPrinter extends CordovaPlugin implements AutoCloseable {
     }
 
     @Override
+    public void onNewIntent(Intent intent) {
+        if(usbHelper != null) {
+            usbHelper.onNewIntent(intent);
+        }
+
+        super.onNewIntent(intent);
+    }
+
+    @Override
     public void onResume(boolean multitasking) {
         if(usbHelper != null) {
             usbHelper.onResume();
