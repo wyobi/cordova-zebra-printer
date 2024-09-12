@@ -16,6 +16,10 @@ exports.printerStatus = function(success, error){
     exec(success, error, 'ZebraPrinter', 'printerStatus', []);
 }
 
+exports.controlLanguage = function(success, error){
+    exec(success, error, 'ZebraPrinter', 'controlLanguage', []);
+}
+
 exports.isConnected = function (success, error) {
     exec(success, error, 'ZebraPrinter', 'isConnected', []);
 };

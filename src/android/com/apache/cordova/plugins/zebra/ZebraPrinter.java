@@ -114,6 +114,9 @@ public class ZebraPrinter extends CordovaPlugin implements AutoCloseable {
             case "printerStatus":
                 this.printerStatus(callbackContext);
                 return true;
+            case "controlLanguage":
+                this.controlLanguage(callbackContext);
+                return true;
         }
         return false;
     }
@@ -131,6 +134,23 @@ public class ZebraPrinter extends CordovaPlugin implements AutoCloseable {
                 callbackContext.success(status);
             } else {
                 callbackContext.error("Failed to get status.");
+            }
+        });
+    }
+
+    /***
+     * Get the printer Control Language. Cordova boilerplate.
+     * @param callbackContext
+     */
+    private void controlLanguage(final CallbackContext callbackContext) {
+        final ZebraPrinter instance = this;
+
+        cordova.getThreadPool().execute(() -> {
+            JSONObject status = instance.GetControlLanguage();
+            if (status != null) {
+                callbackContext.success(status);
+            } else {
+                callbackContext.error("Failed to get controlLanguage.");
             }
         });
     }
@@ -566,6 +586,30 @@ public class ZebraPrinter extends CordovaPlugin implements AutoCloseable {
         }
 
         return errorStatus;
+    }
+
+    /***
+     * Get the status of the currently connected printer
+     * @return
+     */
+    private JSONObject GetControlLanguage() {
+        JSONObject errorStatus = new JSONObject();
+        try {
+            errorStatus.put("connected", false);
+        } catch (Exception e) {
+            System.err.println(e.getMessage());
+        }
+
+        try {
+            JSONObject status = new JSONObject();
+            printerLanguage = printer.getPrinterControlLanguage();
+            status.put("connected", true);
+            status.put("controlLanguage", printerLanguage.toString());
+            return status;
+        } catch (Exception e) {
+            System.err.println(e.getMessage());
+            return errorStatus;
+        }
     }
 
     /***
