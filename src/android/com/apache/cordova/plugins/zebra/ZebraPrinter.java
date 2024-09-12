@@ -144,8 +144,9 @@ public class ZebraPrinter extends CordovaPlugin implements AutoCloseable {
         permissionCallback = callbackContext;
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (!PermissionHelper.hasPermission(this, Manifest.permission.BLUETOOTH_SCAN) || !PermissionHelper.hasPermission(this, Manifest.permission.BLUETOOTH_CONNECT)) {
+            if (!PermissionHelper.hasPermission(this, Manifest.permission.BLUETOOTH) || !PermissionHelper.hasPermission(this, Manifest.permission.BLUETOOTH_SCAN) || !PermissionHelper.hasPermission(this, Manifest.permission.BLUETOOTH_CONNECT)) {
                 List<String> permissionsList = new ArrayList<String>();
+                permissionsList.add(Manifest.permission.BLUETOOTH);
                 permissionsList.add(Manifest.permission.BLUETOOTH_SCAN);
                 permissionsList.add(Manifest.permission.BLUETOOTH_CONNECT);
                 String[] permissionsArray = new String[permissionsList.size()];
@@ -660,7 +661,11 @@ public class ZebraPrinter extends CordovaPlugin implements AutoCloseable {
 
     public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) {
         for (int i = 0; i < permissions.length; i++) {
-            if (permissions[i].equals(Manifest.permission.BLUETOOTH_SCAN) && grantResults[i] == PackageManager.PERMISSION_DENIED) {
+            if (permissions[i].equals(Manifest.permission.BLUETOOTH) && grantResults[i] == PackageManager.PERMISSION_DENIED) {
+                this.permissionCallback.error("Bluetooth permission not granted.");
+                return;
+            }
+            else if (permissions[i].equals(Manifest.permission.BLUETOOTH_SCAN) && grantResults[i] == PackageManager.PERMISSION_DENIED) {
                 this.permissionCallback.error("Bluetooth Scan permission not granted.");
                 return;
             } else if (permissions[i].equals(Manifest.permission.BLUETOOTH_CONNECT) && grantResults[i] == PackageManager.PERMISSION_DENIED) {
