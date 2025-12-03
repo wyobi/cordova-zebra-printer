@@ -27,7 +27,7 @@ class ZebraPrinterPlugin: CDVPlugin {
                 devices.append(device)
             }
             let pluginResult = CDVPluginResult(
-                status: CDVCommandStatus_OK,
+                status: .ok,
                 messageAs: devices
             )
             self.commandDelegate!.send(
@@ -83,7 +83,7 @@ class ZebraPrinterPlugin: CDVPlugin {
                     
                     NSLog("ZebraPrinter:: returning status")
                     let pluginResult = CDVPluginResult(
-                        status: CDVCommandStatus_OK,
+                        status: .ok,
                         messageAs: status
                     )
                     self.commandDelegate!.send(
@@ -95,7 +95,7 @@ class ZebraPrinterPlugin: CDVPlugin {
                     // printer has no status... this happens when the printer turns off, but the driver still thinks it is connected
                     NSLog("ZebraPrinter:: Got a printer but no status. Sadness.")
                     let pluginResult = CDVPluginResult(
-                        status: CDVCommandStatus_ERROR,
+                        status: .error,
                         messageAs: "Printer Has No Status"
                     )
                     self.commandDelegate!.send(
@@ -108,7 +108,7 @@ class ZebraPrinterPlugin: CDVPlugin {
                 NSLog("ZebraPrinter:: status of disconnected printer")
                 // if the printer isn't connected return success with disconnect status
                 let pluginResult = CDVPluginResult(
-                    status: CDVCommandStatus_OK,
+                    status: .ok,
                     messageAs: status
                 )
                 self.commandDelegate!.send(
@@ -138,7 +138,7 @@ class ZebraPrinterPlugin: CDVPlugin {
                 if error != nil{
                     NSLog("ZebraPrinter:: error printing -> " + (error?.localizedDescription ?? "Unknonwn Error"))
                     let pluginResult = CDVPluginResult(
-                        status: CDVCommandStatus_ERROR
+                        status: .error
                     )
                     self.commandDelegate!.send(
                         pluginResult,
@@ -147,7 +147,7 @@ class ZebraPrinterPlugin: CDVPlugin {
                 }else{
                     NSLog("ZebraPrinter:: print completed")
                     let pluginResult = CDVPluginResult(
-                        status: CDVCommandStatus_OK
+                        status: .ok
                     )
                     self.commandDelegate!.send(
                         pluginResult,
@@ -157,7 +157,7 @@ class ZebraPrinterPlugin: CDVPlugin {
             }else{
                 NSLog("ZebraPrinter:: not connected")
                 let pluginResult = CDVPluginResult(
-                    status: CDVCommandStatus_ERROR,
+                    status: .error,
                     messageAs: "Printer Not Connected"
                 )
                 self.commandDelegate!.send(
@@ -174,7 +174,7 @@ class ZebraPrinterPlugin: CDVPlugin {
      */
     @objc func isConnected(_ command: CDVInvokedUrlCommand){
         let pluginResult = CDVPluginResult(
-            status: CDVCommandStatus_OK,
+            status: .ok,
             messageAs: isConnected()
         )
         self.commandDelegate!.send(
@@ -202,7 +202,7 @@ class ZebraPrinterPlugin: CDVPlugin {
             if(address == ""){
                 NSLog("ZebraPrinter:: empty printer address")
                 let pluginResult = CDVPluginResult(
-                    status: CDVCommandStatus_ERROR,
+                    status: .error,
                     messageAs: "Invalid Address"
                 )
                 self.commandDelegate!.send(
@@ -238,7 +238,7 @@ class ZebraPrinterPlugin: CDVPlugin {
                 {
                     NSLog("ZebraPrinter:: nil printer")
                     let pluginResult = CDVPluginResult(
-                        status: CDVCommandStatus_ERROR,
+                        status: .error,
                         messageAs: "Printer Null"
                     )
                     self.commandDelegate!.send(
@@ -248,7 +248,7 @@ class ZebraPrinterPlugin: CDVPlugin {
                 }else{
                     NSLog("ZebraPrinter:: connected")
                     let pluginResult = CDVPluginResult(
-                        status: CDVCommandStatus_OK,
+                        status: .ok,
                         messageAs: "Printer Connected"
                     )
                     self.commandDelegate!.send(
@@ -259,7 +259,7 @@ class ZebraPrinterPlugin: CDVPlugin {
             }else{
                 NSLog("ZebraPrinter:: not connected")
                 let pluginResult = CDVPluginResult(
-                    status: CDVCommandStatus_ERROR,
+                    status: .error,
                     messageAs: "Printer Not Connected"
                 )
                 self.commandDelegate!.send(
@@ -283,7 +283,7 @@ class ZebraPrinterPlugin: CDVPlugin {
         }
         
         let pluginResult = CDVPluginResult(
-            status: CDVCommandStatus_OK
+            status: .ok
         )
         self.commandDelegate!.send(
             pluginResult,
