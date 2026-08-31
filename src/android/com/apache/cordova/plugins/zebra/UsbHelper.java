@@ -70,7 +70,7 @@ public abstract class UsbHelper {
 
         filter = new IntentFilter();
         filter.addAction(USB_PERMISSION_GRANTED_ACTION);
-        parentActivity.registerReceiver(usbPermissionReceiver, filter);
+        registerPermissionReceiver(filter);
     }
 
     public void onResume() {
@@ -80,7 +80,17 @@ public abstract class UsbHelper {
 
         filter = new IntentFilter();
         filter.addAction(USB_PERMISSION_GRANTED_ACTION);
-        parentActivity.registerReceiver(usbPermissionReceiver, filter);
+        registerPermissionReceiver(filter);
+    }
+
+    // USB_PERMISSION_GRANTED_ACTION is not a system broadcast, so Android 14 (targetSdk 34+)
+    // throws SecurityException unless an export flag is supplied when registering.
+    private void registerPermissionReceiver(IntentFilter filter) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            parentActivity.registerReceiver(usbPermissionReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            parentActivity.registerReceiver(usbPermissionReceiver, filter);
+        }
     }
 
     public void onPause() {
@@ -101,7 +111,12 @@ public abstract class UsbHelper {
     }
 
     public void requestUsbPermission(final UsbManager manager, final UsbDevice device) {
-        PendingIntent permissionIntent = PendingIntent.getBroadcast(parentActivity, 0, new Intent(USB_PERMISSION_GRANTED_ACTION), PendingIntent.FLAG_IMMUTABLE);
+        // The system fills EXTRA_DEVICE/EXTRA_PERMISSION_GRANTED into this intent, so it must be
+        // mutable on Android 12+, and package-scoped because Android 14 blocks implicit mutable ones.
+        Intent intent = new Intent(USB_PERMISSION_GRANTED_ACTION);
+        intent.setPackage(parentActivity.getPackageName());
+        int flags = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S ? PendingIntent.FLAG_MUTABLE : 0;
+        PendingIntent permissionIntent = PendingIntent.getBroadcast(parentActivity, 0, intent, flags);
         manager.requestPermission(device, permissionIntent);
     }
 

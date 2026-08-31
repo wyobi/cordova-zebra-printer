@@ -84,7 +84,12 @@ public class ZebraPrinter extends CordovaPlugin implements AutoCloseable {
 
             @Override
             public void usbConnectedAndPermissionGranted(UsbDevice device) {
-                UsbManager usbManager = (UsbManager) cordova.getContext().getSystemService(Context.USB_SERVICE);
+                // onRequestPermissionResult nulls permissionCallback after its retry; a USB grant
+                // arriving after that must not call discover(null) and NPE on a worker thread.
+                if (permissionCallback == null) {
+                    Log.w("EMO", "USB permission granted but no discovery callback is pending; ignoring.");
+                    return;
+                }
                 discover(permissionCallback);
             }};
 
@@ -699,7 +704,11 @@ public class ZebraPrinter extends CordovaPlugin implements AutoCloseable {
                 }
             });
         } catch (Exception e) {
-            System.err.println(e.getMessage());
+            Log.e("EMO", "USB discovery failed", e);
+            // Without this the JS discover() call never settles and the UI hangs on discovery.
+            if (callbackContext != null) {
+                callbackContext.error("Failed to discover USB printers: " + e);
+            }
         }
     }
 
